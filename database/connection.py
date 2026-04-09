@@ -21,4 +21,14 @@ SessionFactory = sessionmaker(
     expire_on_commit=False
 ) 
 
-session = SessionFactory()
+# session = SessionFactory()
+
+# <SQLAlchemy Dependency Injection>
+
+# 세션을 관리하는 함수
+def get_session():
+    session = SessionFactory()
+    try:
+        yield session               # router에서 호출하면 session 반환했다가 일 끝나면 종료
+    finally:
+        session.close()
