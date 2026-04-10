@@ -145,8 +145,7 @@ def delete_user_handler(
     #     #session.expunge(user)    -> 객체에 관심을 끈다.
     #     session.commit()
 
-    # 2) 바로 삭제하는 법
-
+    # 2) 바로 삭제하는법
     stmt = delete(User).where(User.id == user_id)
     session.execute(stmt)
     session.commit()
