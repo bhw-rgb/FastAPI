@@ -6,7 +6,8 @@
 from fastapi import APIRouter, Path, Query, status, HTTPException, Depends
 from sqlalchemy import select, delete
 
-from database.connection import get_session         # 세션 주입
+from database.connection import get_session                       # 세션 주입
+from database.connection_async import get_async_session           # 비동기 세션 추가
 from user.models import User
 from user.request import UserCreateRequest, UserUpdateRequest
 from user.response import UserResponse
@@ -22,11 +23,11 @@ router = APIRouter(prefix="/users", tags=["User"])
     status_code=status.HTTP_200_OK,
     response_model=list[UserResponse]
     )
-def get_users_handler(session = Depends(get_session)):
+async def get_users_handler(session = Depends(get_async_session)):
     # statement = 구문(명령문)
-    stmt = select(User)                     # SELECT * FROM user;
-    result = session.execute(stmt)
-    users = result.scalars().all()          # mappings() -> 딕셔너리로 가져온다. # scalars() -> 맨 첫번째 값만 가져온다.
+    stmt = select(User)                         # SELECT * FROM user;
+    result = await session.execute(stmt)        # execute에 I/O 작업이 발생하시 때문에 await을 넣어준다.
+    users = result.scalars().all()              # mappings() -> 딕셔너리로 가져온다. # scalars() -> 맨 첫번째 값만 가져온다.
 
     return users
 
@@ -37,10 +38,10 @@ def get_users_handler(session = Depends(get_session)):
     summary="사용자 데이터 검색 API",
     response_model=list[UserResponse]
     )
-def search_user_handler(
+async def search_user_handler(
     name: str | None = Query(None), 
     job: str | None = Query(None), 
-    session = Depends(get_session),
+    session = Depends(get_async_session),
     ):                                          # Depends(get_session) -> SQLAlchemy 의존성 주입
     stmt = select(User)
     if name:
@@ -50,7 +51,7 @@ def search_user_handler(
     if not name and not job:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="검색 조건을 입력해주세요.")
     
-    result = session.execute(stmt)
+    result = await session.execute(stmt)
     users = result.scalars().all()
 
     if not users:
@@ -63,13 +64,13 @@ def search_user_handler(
     summary="단일 사용자 데이터 조회 API",
     response_model=UserResponse
     )
-def get_user_handler(
+async def get_user_handler(
     user_id: int = Path(..., ge=1),
-    session = Depends(get_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
+    session = Depends(get_async_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
     ):                                          
     
     stmt = select(User).where(User.id == user_id)
-    result = session.execute(stmt)
+    result = await session.execute(stmt)
     user = result.scalar()                      # scalar() -> 첫 번째 객체 하나만 줘라. 존재하면 user 객체 존재하지 않으면 None
 
     if not user:
@@ -84,14 +85,14 @@ def get_user_handler(
     status_code=status.HTTP_201_CREATED,
     response_model=UserResponse
     )
-def create_user_handler(
+async def create_user_handler(
     body: UserCreateRequest, 
-    session = Depends(get_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
+    session = Depends(get_async_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
     ):
     new_user = User(name=body.name, job=body.job)
-    session.add(new_user)                       # Session 데이터 추가하라고 DB 한테 말함 (등록 예약)
-    session.commit()                            # 변경사항 저장 (진짜 등록)
-    session.refresh(new_user)                   # id, created_at 읽어옴 -> DB랑 FastAPI서버를 동기화한다.
+    session.add(new_user)                           # Session 데이터 추가하라고 DB 한테 말함 (등록 예약)
+    await session.commit()                                # 변경사항 저장 (진짜 등록)
+    await session.refresh(new_user)                       # id, created_at 읽어옴 -> DB랑 FastAPI서버를 동기화한다.
     return new_user
 
 
