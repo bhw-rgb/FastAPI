@@ -102,21 +102,22 @@ async def create_user_handler(
     summary="사용자 데이터 수정 API",
     response_model=UserResponse,
     )
-def update_user_handler(
+async def update_user_handler(
     user_id: int, 
     body: UserUpdateRequest, 
-    session = Depends(get_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
+    session = Depends(get_session),                         # Depends(get_session) -> SQLAlchemy 의존성 주입
     ):
     stmt = select(User).where(User.id == user_id)
-    result = session.execute(stmt)
+    result = await session.execute(stmt)                    # SELECT Query
     user = result.scalar()
 
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User Not Found")
 
     user.job = body.job
-    session.commit()                            # session.commit은 변경사항 저장 add가 필요 없는 이유? 
-                                                # -> session.execute로 가져왔기 때문에 자동 add 함
+    await session.commit()                                  # UPDATE Query
+    # session.commit은 변경사항 저장 add가 필요 없는 이유? 
+    # -> session.execute로 가져왔기 때문에 자동 add 함
     return user
 
 
@@ -128,9 +129,9 @@ def update_user_handler(
     summary="사용자 데이터 삭제 API",
     status_code=status.HTTP_204_NO_CONTENT,
     )
-def delete_user_handler(
+async def delete_user_handler(
     user_id:int, 
-    session = Depends(get_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
+    session = Depends(get_async_session),             # Depends(get_session) -> SQLAlchemy 의존성 주입
     ): 
 
     # 1) 의존성 주입 전 코드 | 조회하고 삭제하는법
@@ -142,11 +143,11 @@ def delete_user_handler(
     #     if not user:
     #         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User Not Found")
         
-    #     session.delete(user)      #-> 객체를 지운다.
-    #     #session.expunge(user)    -> 객체에 관심을 끈다.
+    #     session.delete(user)   #-> 객체 삭제.
+    #     #session.expunge(user)  -> 객체에 관심을 끈다.
     #     session.commit()
 
     # 2) 바로 삭제하는법
     stmt = delete(User).where(User.id == user_id)
-    session.execute(stmt)
-    session.commit()
+    await session.execute(stmt)     # 삭제
+    await session.commit()          # 확정
